@@ -27,3 +27,5 @@
   ansible.builtin.import_playbook: forgejo.yml
 - name: Provision Runners
   ansible.builtin.import_playbook: runner.yml
+- name: Provision Authentik-LDAP
+  ansible.builtin.import_playbook: authentik-ldap.yml
