@@ -22,6 +22,7 @@ prometheus_home_hosts:
   - forgejo
   - freeipa02
   - authentik
+  - authentik-ldap
 prometheus_mbc_hosts:
   - arch.internal
 prometheus_fw_hosts:
