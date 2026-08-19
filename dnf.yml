@@ -1,0 +1,15 @@
+---
+- name: Set DNF to use proxy server
+  become: true
+  hosts: proxmox_all_qemu,ca,openbao
+
+  roles:
+    - role: dnf
+      tags: proxy,dnf
+
+  tasks:
+    - name: Install htop
+      ansible.builtin.dnf:
+        name: htop
+        state: present
+      tags: htop

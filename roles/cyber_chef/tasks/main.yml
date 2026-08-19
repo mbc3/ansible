@@ -1,0 +1,64 @@
+---
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ cyber_chef_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ cyber_chef_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ cyber_chef_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ cyber_chef_user }}"
+      changed_when: false
+
+- name: Set up cyber chef
+  become: true
+  become_user: "{{ cyber_chef_user }}"
+  notify: Restart cyber chef
+  block:
+    - name: Pull cyber chef image
+      containers.podman.podman_image:
+        name: "{{ cyber_chef_image }}"
+        tag: "{{ cyber_chef_image_version }}"
+
+    - name: Create cyber chef quadlet file
+      containers.podman.podman_container:
+        name: cyber_chef
+        image: "{{ cyber_chef_image }}:{{ cyber_chef_image_version }}"
+        state: quadlet
+        network:
+          - host
+        quadlet_filename: cyber_chef
+        quadlet_dir: "/home/{{ cyber_chef_user }}/.config/containers/systemd"
+        publish:
+          - "{{ cyber_chef_port }}:8080"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+- name: Start cyber chef
+  become: true
+  become_user: "{{ cyber_chef_user }}"
+  ansible.builtin.systemd_service:
+    name: cyber_chef
+    daemon_reload: true
+    scope: user
+    state: started

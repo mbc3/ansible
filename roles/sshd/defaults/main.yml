@@ -1,0 +1,5 @@
+---
+sshd_allowed_users:
+  - ansible
+  - mbc
+  - bot

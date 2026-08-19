@@ -1,0 +1,25 @@
+{
+    acme_ca {{ caddy_ca_directory }}
+    email {{ caddy_email }}
+}
+{% for key, value in caddy_services.items() %}
+{{ key }}.{{ inventory_hostname }}.localdomain  {
+    reverse_proxy {% if caddy_proxy_to_https %}https://{% endif %}localhost:{{ value }}{% if caddy_proxy_to_https or caddy_headers %} { {% endif %}
+
+    {% if caddy_headers %}{% for key, value in caddy_headers.items() %}
+    header_up {{ key }} {{ value }}
+    {% endfor %}{% endif %}
+
+{% if caddy_proxy_to_https %}
+    transport http {
+        tls
+        tls_insecure_skip_verify
+    }
+{% endif %}
+
+{% if caddy_proxy_to_https or caddy_headers %}
+}
+{% endif %}
+encode zstd gzip
+}
+{% endfor %}

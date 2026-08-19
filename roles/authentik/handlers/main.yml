@@ -1,0 +1,13 @@
+---
+- name: Restart Authentik
+  become: true
+  become_user: "{{ authentik_user }}"
+  ansible.builtin.systemd_service:
+    name: authentik-pod
+    scope: user
+    state: restarted
+
+- name: Restart firewalld
+  ansible.builtin.systemd_service:
+    name: firewalld
+    state: restarted

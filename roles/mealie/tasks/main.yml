@@ -1,0 +1,78 @@
+---
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ mealie_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ mealie_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ mealie_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ mealie_user }}"
+      changed_when: false
+
+- name: Create mealie bind mount
+  ansible.builtin.file:
+    state: directory
+    path: /opt/mealie-data
+    owner: "{{ mealie_user }}"
+    group: "{{ mealie_user }}"
+    mode: "0775"
+
+- name: Set up mealie
+  become: true
+  become_user: "{{ mealie_user }}"
+  notify: Restart Mealie
+  block:
+    - name: Pull mealie image
+      containers.podman.podman_image:
+        name: "{{ mealie_image }}"
+        tag: "{{ mealie_image_version }}"
+
+    - name: Create mealie quadlet file
+      containers.podman.podman_container:
+        name: mealie
+        image: "{{ mealie_image }}:{{ mealie_image_version }}"
+        state: quadlet
+        network:
+          - host # unfortunately has to be host because uvicorn is rejecting traffic on bridge
+        quadlet_filename: mealie
+        quadlet_dir: "/home/{{ mealie_user }}/.config/containers/systemd"
+        volume:
+          - /opt/mealie-data:/app/data/:z
+        env:
+          BASE_URL: "https://cooking.hosted.localdomain"
+          TZ: "America/Los_Angeles"
+          PUID: 1777 # selfie user
+          PGID: 1777 # selfie group
+          ALLOW_SIGNUP: "false"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+- name: Start mealie
+  become: true
+  become_user: "{{ mealie_user }}"
+  ansible.builtin.systemd_service:
+    name: mealie
+    daemon_reload: true
+    scope: user
+    state: started

@@ -1,0 +1,4 @@
+---
+rsyslog_server: "logs"
+rsyslog_port: "1514"
+rsyslog_protocol: "udp"

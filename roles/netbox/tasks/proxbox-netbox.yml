@@ -1,0 +1,52 @@
+---
+
+- name: Add proxbox custom firewalld service
+  ansible.builtin.copy:
+    src: proxbox-netbox.xml
+    dest: /etc/firewalld/services/proxbox-netbox.xml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart firewalld
+
+- name: Add proxbox firewalld service
+  ansible.posix.firewalld:
+    service: proxbox-netbox
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Set up netbox plugin container
+  become: true
+  become_user: "{{ netbox_user }}"
+  notify: Restart Proxbox API
+  block:
+
+    - name: Pull proxbox api image
+      containers.podman.podman_image:
+        name: docker.io/emersonfelipesp/proxbox-api
+        tag: latest
+
+    - name: Create proxbox api quadlet file
+      containers.podman.podman_container:
+        name: proxbox-api
+        image: "docker.io/emersonfelipesp/proxbox-api:latest"
+        state: quadlet
+        publish:
+          - 8800:8000
+        env:
+          PROXBOX_ENCRYPTION_KEY: "{{ netbox_proxbox_encryption_key }}"
+          PROXBOX_BIND_HOST: "::"
+        quadlet_filename: proxbox-api
+        quadlet_dir: "/home/{{ netbox_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            Before=netbox-pod.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target

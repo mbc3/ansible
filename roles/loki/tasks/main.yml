@@ -1,0 +1,109 @@
+---
+- name: Create grafana account
+  ansible.builtin.user:
+    name: "{{ loki_user }}"
+    shell: /bin/bash
+    password: "{{ vault_grafana_password | password_hash('sha512', vault_password_salt) }}"
+
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ loki_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ loki_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ loki_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ loki_user }}"
+      changed_when: false
+
+- name: Add logging custom firewalld service
+  ansible.builtin.copy:
+    src: logging.xml
+    dest: /etc/firewalld/services/logging.xml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart firewalld
+
+- name: Add logging firewalld service
+  ansible.posix.firewalld:
+    service: logging
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Make Loki config dir
+  ansible.builtin.file:
+    name: /opt/loki
+    state: directory
+    owner: "{{ loki_user }}"
+    group: "{{ loki_user }}"
+    mode: "0775"
+
+- name: Copy Loki config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /opt/loki/loki-config.yaml
+    owner: "{{ loki_user }}"
+    group: "{{ loki_user }}"
+    mode: "0664"
+  notify: Restart Loki
+
+- name: Set up Loki
+  become: true
+  become_user: "{{ loki_user }}"
+  notify: Restart Loki
+  block:
+    - name: Pull Loki image
+      containers.podman.podman_image:
+        name: docker.io/grafana/loki
+        tag: "{{ loki_image_version }}"
+
+    - name: Create logs pod
+      containers.podman.podman_pod:
+        name: logs
+        state: quadlet
+        ports:
+          - 3100:3100
+          - 12345:12345
+          - 1514:1514/tcp
+          - 1514:1514/udp
+        dns:
+          - 192.168.7.101
+          - 192.168.7.106
+        quadlet_filename: logs.pod
+        quadlet_dir: "/home/{{ loki_user }}/.config/containers/systemd"
+
+    - name: Create Loki quadlet file
+      containers.podman.podman_container:
+        name: loki
+        image: "docker.io/grafana/loki:{{ loki_image_version }}"
+        state: quadlet
+        pod: logs.pod
+        quadlet_filename: loki
+        quadlet_dir: "/home/{{ loki_user }}/.config/containers/systemd"
+        volume:
+          - "/opt/loki:/mnt/config:z"
+        command: -config.file=/mnt/config/loki-config.yaml
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=network-online.target
+            After=network-online.target
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target

@@ -1,0 +1,61 @@
+---
+- name: Install Podman
+  block:
+    - name: Install Podman
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ uptime_kuma_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ uptime_kuma_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ uptime_kuma_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ uptime_kuma_user }}"
+      changed_when: false
+
+- name: Set up Uptime Kuma
+  become: true
+  become_user: "{{ uptime_kuma_user }}"
+  notify: Restart Uptime Kuma
+  block:
+    - name: Create Uptime Kuma podman volume
+      containers.podman.podman_volume:
+        name: uptime-kuma
+        state: present
+
+    - name: Pull Uptime Kuma image
+      containers.podman.podman_image:
+        name: "{{ uptime_kuma_image }}"
+        tag: "{{ uptime_kuma_image_version }}"
+
+    - name: Create Uptime Kuma quadlet file
+      containers.podman.podman_container:
+        name: uptime-kuma
+        image: "{{ uptime_kuma_image }}:{{ uptime_kuma_image_version }}"
+        state: quadlet
+        quadlet_filename: uptime-kuma
+        quadlet_dir: "/home/{{ uptime_kuma_user }}/.config/containers/systemd"
+        cap_add: "NET_RAW"
+        ports:
+          - "{{ uptime_kuma_port }}:{{ uptime_kuma_port }}"
+        volumes:
+          - "uptime-kuma:/app/data"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target

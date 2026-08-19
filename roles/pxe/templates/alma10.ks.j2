@@ -1,0 +1,118 @@
+#
+#version=RHEL10
+# Use text install
+text
+
+# TO DO:
+# do ansible pull based on hostname
+
+%pre
+#!/bin/sh
+for arg in $(cat /proc/cmdline); do
+    case $arg in
+    hostname=*)
+        HOSTNAME=${arg#hostname=}
+    ;;
+    ip=*)
+        IP=${arg#ip=}
+    esac
+done
+echo "network --bootproto=static --device=link --ip "$IP" --ipv6 auto --netmask {{ pxe_netmask }} --gateway {{ pxe_gateway }} --hostname "$HOSTNAME" --nameserver {{ pxe_nameservers }} --ipv4-dns-search {{ pxe_search_domain }}" >> /tmp/network.ks
+%end
+
+# kernel dump
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+%end
+
+# Network information
+# Link device is the first device with an uplink
+# pulling from the network info in pre
+
+%include /tmp/network.ks
+
+# add base repositories with mirrors for install only
+repo --name="almalinux10-baseos" --mirrorlist="https://mirrors.almalinux.org/mirrorlist/10/baseos"
+repo --name="almalinux10-appstream" --mirrorlist="https://mirrors.almalinux.org/mirrorlist/10/appstream"
+
+# add epel repo with mirrors for install only
+repo --name="epel10-everything" --mirrorlist="https://mirrors.fedoraproject.org/mirrorlist?repo=epel-10&arch=x86_64"
+
+# add CRB with mirrors
+repo --name="CRB" --mirrorlist="https://mirrors.almalinux.org/mirrorlist/10/crb/"
+
+# use internet install
+url --url="https://repo.almalinux.org/almalinux/10/BaseOS/x86_64/kickstart/"
+
+# Keyboard layouts
+keyboard --vckeymap=us --xlayouts='us'
+# System language
+lang en_US.UTF-8
+
+%packages
+@minimal-environment
+{% for item in pxe_provision_packages %}
+{{ item }}
+{% endfor %}
+%end
+
+# Partition clearing information
+clearpart --all --initlabel
+# Disk partitioning information
+
+reqpart --add-boot
+
+part pv.1 --size 15000 --grow --fstype=xfs --ondrive=sda
+volgroup system  pv.1
+logvol / --vgname system --size=8192 --grow --name=root
+logvol swap --vgname system --size=2048 --name=swap
+
+timesource --ntp-server=opnsense.localdomain
+timezone America/Los_Angeles --utc
+
+#Root password
+rootpw --lock
+user --name=ansible --password=$y$j9T$CQJ4/qQB3pxF5EJtTNAvf/$xXkoECoivdug8QCHggrWWLfDd5Lvxj2R3NgIyNX/w07 --iscrypted --gecos="Ansible Service Account" --uid=1069 --gid=1069
+
+%post
+#!/bin/bash
+systemctl enable qemu-guest-agent
+# ssh keys
+mkdir -p /home/ansible/.ssh
+chmod 0700 /home/ansible/.ssh
+echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE5jb8Vcw0M2BxH4+LxWWc6oBJxa2VsGxlmOjUUGFVpk mbc@arch" > /home/ansible/.ssh/authorized_keys
+chmod 0600 /home/ansible/.ssh/authorized_keys
+echo "ansible ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/99-ansible
+chown -R ansible:ansible /home/ansible/.ssh
+# selinux to get ssh working
+restorecon -R /home/ansible/.ssh
+restorecon -R /home/ansible
+touch /.autorelabel
+# install epel repos
+dnf install epel-release -y
+dnf config-manager --set-enabled crb
+
+tee /etc/pki/ca-trust/source/anchors/tmp_homelab_ca.crt <<EOF
+-----BEGIN CERTIFICATE-----
+MIIBiDCCAS6gAwIBAgIRALh+HiTWYCHvSKnLI4TNQDowCgYIKoZIzj0EAwIwIjEL
+MAkGA1UEChMCQ0ExEzARBgNVBAMTCkNBIFJvb3QgQ0EwHhcNMjUwNDExMjIyMDE4
+WhcNMzUwNDA5MjIyMDE4WjAiMQswCQYDVQQKEwJDQTETMBEGA1UEAxMKQ0EgUm9v
+dCBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHYXF3RxPI++VDK3tdK6vaij
+4NN1HyuXqQ66RNxvVhZyIaVOJ7ohAXPgRof9cgr+naZgN9GC6mc8k3mPO4pB8aSj
+RTBDMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEBMB0GA1UdDgQW
+BBQczuDrzAzBGuM12rhYf9pjIVUauzAKBggqhkjOPQQDAgNIADBFAiBwv+V4U0xi
+dAMFzKRHIpGumuIgeyHqj6RPlVdVwyeASwIhAPpzzxVACND5ehHzSATyb0fxcwG/
+QhbpdNH5UZSuxVr+
+-----END CERTIFICATE-----
+EOF
+
+update-ca-trust
+
+# ansible pull
+
+sudo -u ansible ansible-pull --url https://repo.forgejo.localdomain/mbc/Provision provision.yml
+sudo -u ansible ansible-pull --url https://repo.forgejo.localdomain/mbc/HomeLab_Ansible/HomeLab base.yml
+
+%end
+
+# Reboot the node
+reboot

@@ -1,0 +1,10 @@
+netbox_packages:
+  - podman
+  - systemd-container
+netbox_user: netbox
+netbox_image_version: "latest"
+netbox_postgres_version: 18
+netbox_redis_version: 8.8
+netbox_plugins:
+  - "netbox_proxbox"
+netbox_proxbox_encryption_key: "{{ vault_proxbox_encryption_key }}"

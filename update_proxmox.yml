@@ -1,0 +1,17 @@
+---
+- name: Update all proxmox hosts
+  become: true
+  hosts: proxmox_nodes
+
+  tasks:
+    - name: Update all packages
+      ansible.builtin.package:
+        name: "*"
+        state: latest
+      register: updates
+      notify: Display updated packages
+  handlers:
+    - name: Display updated packages
+      ansible.builtin.debug:
+        var: updates
+      when: updates is defined

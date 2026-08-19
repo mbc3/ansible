@@ -1,0 +1,13 @@
+---
+- name: Add OPnSense service account user
+  ansible.builtin.user:
+    name: opnsense
+    state: present
+    create_home: true
+    comment: "OPNSense Backups Service Account"
+    system: true
+- name: Add Opnsense Backups SSH key
+  ansible.posix.authorized_key:
+    user: opnsense
+    state: present
+    key: "{{ opnsense_backup_pub_key }}"

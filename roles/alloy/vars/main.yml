@@ -1,0 +1,9 @@
+---
+alloy_user: "grafana"
+alloy_port: "1514"
+alloy_protocol: "udp"
+alloy_loki_port: "3100"
+alloy_packages:
+  - podman
+  - systemd-container
+alloy_image_version: "latest"

@@ -1,0 +1,108 @@
+---
+- name: Create grafana account
+  ansible.builtin.user:
+    name: "{{ prometheus_user }}"
+    shell: /bin/bash
+    password: "{{ vault_grafana_password | password_hash('sha512', vault_password_salt) }}"
+
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ grafana_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ grafana_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ grafana_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ grafana_user }}"
+      changed_when: false
+
+- name: Set up CA
+  block:
+    - name: Make CA bind mount dir
+      ansible.builtin.file:
+        path: /opt/certs
+        state: directory
+        owner: "{{ grafana_user }}"
+        group: "{{ grafana_user }}"
+        mode: "0775"
+
+    - name: Make CA bind mount symlink
+      ansible.builtin.file:
+        src: /etc/pki/ca-trust/source/anchors/CA_Root_CA_245232792019447878191676770232143003706.pem
+        dest: /opt/certs/CA_Root_CA_245232792019447878191676770232143003706.pem
+        state: link
+        owner: "{{ grafana_user }}"
+        group: "{{ grafana_user }}"
+        mode: "0777"
+
+- name: Set up Grafana
+  become: true
+  become_user: "{{ grafana_user }}"
+  notify: Restart Grafana
+  block:
+    - name: Pull Grafana image
+      containers.podman.podman_image:
+        name: docker.io/grafana/grafana
+        tag: "{{ grafana_image_version }}"
+
+    - name: Create Grafana podman volume
+      containers.podman.podman_volume:
+        name: grafana-storage
+        state: present
+
+    - name: Create graphs pod
+      containers.podman.podman_pod:
+        name: graphs
+        state: quadlet
+        ports:
+          - 3000:3000
+          - 9090:9090
+          - 9221:9221
+          - 8080:8080
+        dns:
+          - 192.168.7.101
+          - 192.168.7.106
+        quadlet_filename: graphs.pod
+        quadlet_dir: "/home/{{ grafana_user }}/.config/containers/systemd"
+
+    - name: Create Grafana quadlet file
+      containers.podman.podman_container:
+        name: grafana
+        image: "docker.io/grafana/grafana:{{ grafana_image_version }}"
+        pod: graphs.pod
+        state: quadlet
+        quadlet_filename: grafana
+        quadlet_dir: "/home/{{ grafana_user }}/.config/containers/systemd"
+        volume:
+          - "grafana-storage:/var/lib/grafana"
+          - "/opt/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:z" # make sure this file exists by cat-ing the root ca in /opt/certs with the grafana certs
+        env:
+          GF_ANALYTICS_REPORTING_ENABLED: false
+          GF_SMTP_ENABLED: true
+          GF_SMTP_HOST: "{{ grafana_smtp_mail_server }}"
+          GF_STARTTLS_POLICY: "OpportunisticStartTLS"
+          GF_SMTP_FROM_ADDRESS: "no-reply@sleepycow.fun"
+          GF_SMTP_USER: "{{ grafana_smtp_user }}"
+          GF_SMTP_PASSWORD: "{{ grafana_smtp_password }}"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target

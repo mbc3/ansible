@@ -1,0 +1,24 @@
+---
+- name: Set up runner servers
+  hosts: runner01,runner02
+  become: true
+
+  roles:
+    - role: rsyslog
+      tags: logs
+
+    - role: sshd
+
+    - role: sudo
+
+    - role: prometheus_client
+      tags: metrics
+
+    - role: freeipa_client
+      tags: auth
+
+    - role: ca_client
+      tags: auth
+
+    - role: forgejo_runner
+      tags: runner

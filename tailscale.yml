@@ -1,0 +1,7 @@
+---
+- name: Set tailscale
+  become: true
+  hosts: hosted,forgejo
+
+  roles:
+    - role: tailscale

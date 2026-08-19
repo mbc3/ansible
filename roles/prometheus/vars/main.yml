@@ -1,0 +1,32 @@
+---
+prometheus_user: "grafana"
+prometheus_packages:
+  - podman
+  - systemd-container
+prometheus_port: "9100"
+prometheus_systemd_port: "9558"
+prometheus_home_hosts:
+  - logs
+  - host.containers.internal # this is graphs -- needs to be set this way so the prometheus rootless bridged container can access the host
+  - dns01
+  - dns02
+  - freeipa01
+  - files
+  - openbao
+  - netboot
+  - services
+  - hosted
+  - proxy
+  - runner01
+  - runner02
+  - forgejo
+  - freeipa02
+  - authentik
+prometheus_mbc_hosts:
+  - arch.internal
+prometheus_fw_hosts:
+  - opnsense
+prometheus_pve_host: services
+prometheus_pve_port: "9221"
+prometheus_opnsense_port: "8080"
+prometheus_image_version: "main"

@@ -1,0 +1,92 @@
+---
+## This role doesn't configure the initial freeipa setup
+- name: Install FreeIPA Server
+  ansible.builtin.dnf:
+    name: ipa-server
+    state: present
+
+- name: Open required ports on firewalld
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: enabled
+    permanent: true
+    immediate: true
+  loop: "{{ freeipa_services }}"
+
+- name: FreeIPA users/groups config
+  block:
+
+    - name: Set default login shell to bash
+      community.general.ipa_config:
+        ipadefaultloginshell: /usr/bin/bash
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"
+
+    - name: Create mbc user
+      community.general.ipa_user:
+        name: "{{ freeipa_username }}"
+        state: present
+        givenname: Matt
+        sn: Cohen
+        loginshell: /usr/bin/bash
+        password: "{{ freeipa_user_password }}"
+        update_password: on_create
+        sshpubkey:
+          - "{{ mbc_pub_key }}"
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"
+
+    - name: Modify the global password policy
+      community.general.ipa_pwpolicy:
+        maxpwdlife: '9999'
+        minpwdlife: '1'
+        historylength: '2'
+        minclasses: '1'
+        minlength: '8'
+        maxfailcount: '6'
+        failinterval: '120'
+        lockouttime: '120'
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"
+
+    - name: Create bot user
+      community.general.ipa_user:
+        name: "bot"
+        state: present
+        givenname: Bit
+        sn: Bot
+        loginshell: /usr/bin/bash
+        sshpubkey:
+          - "{{ bot_pub_key }}"
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"
+
+    - name: Ensure group is present
+      community.general.ipa_group:
+        name: sysadmin
+        state: present
+        user:
+          - mbc
+          - bot
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"
+
+    - name: Sysadmin sudo rule
+      community.general.ipa_sudorule:
+        name: sysadmin
+        description: Allow sysadmins to do anything without a password
+        cmdcategory: all
+        hostcategory: all
+        usergroup:
+          - sysadmin
+        sudoopt:
+          - '!authenticate'
+
+        ipa_host: "{{ inventory_hostname }}.{{ domain }}"
+        ipa_user: "{{ freeipa_admin }}"
+        ipa_pass: "{{ vault_freeipa_admin_password }}"

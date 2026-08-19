@@ -1,0 +1,29 @@
+---
+- name: Provision CA
+  ansible.builtin.import_playbook: ca.yml
+- name: Provision Proxy
+  ansible.builtin.import_playbook: proxy.yml
+- name: Provision Files
+  ansible.builtin.import_playbook: files.yml
+- name: Provision FreeIPA01
+  ansible.builtin.import_playbook: freeipa01.yml
+- name: Provision FreeIPA02
+  ansible.builtin.import_playbook: freeipa02.yml
+- name: Provision Graphs
+  ansible.builtin.import_playbook: graphs.yml
+- name: Provision Logs
+  ansible.builtin.import_playbook: logs.yml
+- name: Provision Netboot
+  ansible.builtin.import_playbook: netboot.yml
+- name: Provision Authentik
+  ansible.builtin.import_playbook: authentik.yml
+- name: Provision OpenBao
+  ansible.builtin.import_playbook: openbao.yml
+- name: Provision DNS
+  ansible.builtin.import_playbook: dns.yml
+- name: Provision Hosted
+  ansible.builtin.import_playbook: hosted.yml
+- name: Provision Forgejo
+  ansible.builtin.import_playbook: forgejo.yml
+- name: Provision Runners
+  ansible.builtin.import_playbook: runner.yml

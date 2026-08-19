@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+<short>Authentik LDAP</short>
+<description>Authentik LDAP Outpost</description>
+<port port="3389" protocol="tcp"/>
+<port port="6636" protocol="tcp"/>
+</service>

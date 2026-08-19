@@ -1,0 +1,8 @@
+---
+stirling_pdf_packages:
+  - podman
+  - systemd-container
+stirling_pdf_user: selfie
+stirling_pdf_image: "docker.io/stirlingtools/stirling-pdf"
+stirling_pdf_port: 9080
+stirling_pdf_image_version: "latest"

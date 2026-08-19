@@ -1,0 +1,35 @@
+---
+- name: Set Ansible user to NOPASSWD in sudoers
+  community.general.sudoers:
+    name: 99-ansible
+    state: present
+    user: ansible
+    runas: ALL
+    commands: ALL
+    host: ALL
+    nopassword: true
+    validation: required # this enforces sudoers validation
+
+- name: Copy pty and log config
+  ansible.builtin.copy:
+    src: 69-pty-logs
+    dest: /etc/sudoers.d/
+    owner: root
+    group: root
+    mode: "0440"
+
+- name: Copy ioreplay config
+  ansible.builtin.copy:
+    src: 69-sudo-io
+    dest: /etc/sudoers.d/
+    owner: root
+    group: root
+    mode: "0440"
+
+- name: Copy sudo logrotate config
+  ansible.builtin.template:
+    src: sudo.j2
+    dest: /etc/logrotate.d/sudo
+    owner: root
+    group: root
+    mode: "0644"

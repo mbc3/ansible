@@ -1,0 +1,24 @@
+---
+- name: Create mountpoints
+  ansible.builtin.file:
+    state: directory
+    path: "{{ item.value }}"
+    owner: root
+    group: root
+    mode: "0777"
+  loop: "{{ nfs_client_mounts | dict2items }}"
+
+- name: Install nfs-utils
+  ansible.builtin.package:
+    name: nfs-utils
+    state: present
+
+- name: Mount NFS share
+  ansible.posix.mount:
+    src: "{{ item.key }}"
+    path: "{{ item.value }}"
+    opts: rw,sync,hard
+    boot: true
+    state: mounted
+    fstype: nfs
+  loop: "{{ nfs_client_mounts | dict2items }}"

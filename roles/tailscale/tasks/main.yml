@@ -1,0 +1,50 @@
+---
+## NOTE: have to add the following lines
+## to the bottom of /etc/pve/lxc/<container id>.conf
+## lxc.cgroup2.devices.allow: c 10:200 rwm
+## lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+
+- name: Install Tailscale (Debian)
+  when: ansible_facts["distribution"] == "Debian"
+  block:
+    - name: Install GPG
+      ansible.builtin.apt:
+        name: gpg
+        state: present
+
+    - name: Add Tailscale repo
+      ansible.builtin.deb822_repository:
+        name: tailscale
+        suites:
+          - trixie
+        types:
+          - deb
+        components:
+          - main
+        signed_by: https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg
+        uris: https://pkgs.tailscale.com/stable/debian/
+
+- name: Install Tailscale (RHEL)
+  when: ansible_facts["distribution"] == "AlmaLinux"
+  block:
+    - name: Add Tailscale repo
+      ansible.builtin.command: "dnf config-manager --add-repo {{ tailscale_dnf_repo }}"
+      changed_when: false
+
+    - name: Add UPNP firewalld rule
+      ansible.posix.firewalld:
+        service: upnp-client
+        state: enabled
+        immediate: true
+        permanent: true
+
+- name: Install Tailscale
+  ansible.builtin.package:
+    name: tailscale
+    state: present
+
+- name: Enable tailscaled
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started

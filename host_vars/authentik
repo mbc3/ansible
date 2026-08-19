@@ -1,0 +1,12 @@
+caddy_services:
+# key is subdomain, ie pihole.mediapi.localdomain
+# value is port for reverse proxy, ie 8080
+    sso: "9443"
+# if extra caddy headers are needed
+caddy_headers:
+    X-Real-IP: "{remote-host}"
+    X-Forwarded-For: "{remote_host}"
+    X-Forwarded-Proto: "{scheme}"
+    host: "{host}"
+# if proxying to https
+caddy_proxy_to_https: true

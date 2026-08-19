@@ -1,0 +1,183 @@
+---
+- name: Setup user account
+  block:
+    - name: Create netbox user
+      ansible.builtin.user:
+        name: "{{ netbox_user }}"
+        comment: "{{ netbox_user }} Service Account"
+        shell: /usr/bin/bash
+        password: "{{ vault_netbox_netbox_password | password_hash('sha512', vault_password_salt) }}"
+
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ netbox_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ netbox_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ netbox_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ netbox_user }}"
+      changed_when: false
+
+    - name: Create volume mount
+      ansible.builtin.file:
+        state: directory
+        path: /opt/netbox/config
+        owner: "{{ netbox_user }}"
+        group: "{{ netbox_user }}"
+        mode: "0775"
+
+    - name: Create db volume mount
+      ansible.builtin.file:
+        state: directory
+        path: /opt/postgres
+        owner: "{{ netbox_user }}"
+        group: "{{ netbox_user }}"
+        mode: "0775"
+
+- name: Build Plugin Container
+  ansible.builtin.include_tasks: plugin.yml
+
+- name: Set up Proxmox Netbox API Container
+  ansible.builtin.include_tasks: proxbox-netbox.yml
+
+- name: Set up netbox container
+  become: true
+  become_user: "{{ netbox_user }}"
+  block:
+
+    - name: Pull postgres image
+      containers.podman.podman_image:
+        name: docker.io/postgres
+        tag: "{{ netbox_postgres_version }}"
+
+    - name: Pull redis image
+      containers.podman.podman_image:
+        name: docker.io/redis
+        tag: "{{ netbox_redis_version }}"
+
+    - name: Create netbox pod
+      containers.podman.podman_pod:
+        name: netbox
+        state: quadlet
+        ports:
+          - 8000:8000
+        quadlet_filename: netbox.pod
+        quadlet_dir: "/home/{{ netbox_user }}/.config/containers/systemd"
+        quadlet_options:
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create postgres quadlet file
+      containers.podman.podman_container:
+        name: netbox-db
+        image: "docker.io/postgres:{{ netbox_postgres_version }}"
+        pod: netbox.pod
+        state: quadlet
+        quadlet_filename: netbox-db
+        quadlet_dir: "/home/{{ netbox_user }}/.config/containers/systemd"
+        volume:
+          - /opt/postgres:/var/lib/postgresql:z
+        env:
+          POSTGRES_PASSWORD: "{{ vault_netbox_postgres_password }}"
+          POSTGRES_USER: "netbox"
+          POSTGRES_DB: "netbox"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            Before=netbox-app.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create redis quadlet file
+      containers.podman.podman_container:
+        name: netbox-redis
+        image: "docker.io/redis:{{ netbox_redis_version }}"
+        pod: netbox.pod
+        state: quadlet
+        quadlet_filename: netbox-redis
+        quadlet_dir: "/home/{{ netbox_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - "LogDriver=journald"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            Before=netbox-app.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create netbox app quadlet file
+      containers.podman.podman_container:
+        name: netbox-app
+        image: localhost/netbox-plugin:latest
+        pod: netbox.pod
+        state: quadlet
+        quadlet_filename: netbox-app
+        quadlet_dir: "/home/{{ netbox_user }}/.config/containers/systemd"
+        volume:
+          - /opt/netbox/config:/config:z
+        env:
+          PUID: "1001" # netbox user
+          PGID: "1001" # netbox user
+          TZ: "Etc/UTC"
+          SUPERUSER_EMAIL: "cohen@matthewbriancohen.com"
+          SUPERUSER_PASSWORD: "{{ vault_netbox_superuser_password }}" # superuser account that is created by default is "admin"
+          ALLOWED_HOST: "box.netbox.localdomain"
+          DB_NAME: "netbox"
+          DB_USER: "netbox"
+          DB_PASSWORD: "{{ vault_netbox_postgres_password }}"
+          DB_HOST: "netbox-db"
+          DB_PORT: "5432"
+          REDIS_HOST: "netbox-redis"
+          REDIS_PORT: "6379"
+        quadlet_options: # not specifiing auto update here because we're building the image locally, so we can't auto update it
+          - "LogDriver=journald"
+          - |
+            [Unit]
+            Wants=netbox-db.service netbox-redis.service
+            After=netbox-db.service netbox-redis.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+      notify: Restart Netbox
+
+    - name: Start Netbox
+      become: true
+      become_user: "{{ netbox_user }}"
+      ansible.builtin.systemd_service:
+        name: netbox-pod
+        daemon_reload: true
+        scope: user
+        state: started
+
+    - name: Remind user to edit configuration.py
+      ansible.builtin.debug:
+        msg: "please edit /opt/netbox/config/configuration.py with the correct config details! This includes plugins!"

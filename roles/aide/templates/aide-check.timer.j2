@@ -1,0 +1,11 @@
+[Unit]
+Description=AIDE check
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec={{ aide_random_delay_time }}
+FixedRandomDelay=true
+Persistent=true
+
+[Install]
+WantedBy=timers.target

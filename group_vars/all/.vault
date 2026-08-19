@@ -1,0 +1,5 @@
+#!/usr/bin/fish
+
+# exported as universal fish variable with -U on arch machine
+
+echo "$ANSIBLE_PROXMOX_VAULT_PASSWORD"

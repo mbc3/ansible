@@ -1,0 +1,79 @@
+---
+# TO DO: Improve partitioning / filesystem creation - what if device changes?
+- name: Create a new primary partition for proto external disk
+  community.general.parted:
+    device: /dev/sdb
+    number: 1
+    state: present
+    part_end: "100%"
+- name: Create xfs filesystem on proto
+  community.general.filesystem:
+    dev: /dev/sdb1
+    fstype: xfs
+- name: Ensure mountpoints exist
+  ansible.builtin.file:
+    path: "{{ nfs_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0777"
+# TO DO: Improve the mounting here
+# - name: Mount external file partion - files
+#   ansible.posix.mount:
+#     src: 'UUID="{{ ansible_facts.devices.sdb.links.uuids }}"'
+#     path: "{{ nfs_directory }}"
+#     boot: true
+#     state: mounted
+#     fstype: xfs
+# - name: Mount external file partion - proto
+#   ansible.posix.mount:
+#     src: 'UUID="{{ ansible_facts.devices.sdc.links.uuids }}"'
+#     path: "{{ nfs_directory_other }}"
+#     boot: true
+#     state: mounted
+#     fstype: xfs
+- name: Install NFS
+  ansible.builtin.dnf:
+    name: nfs-utils
+    state: present
+- name: Enable NFS
+  ansible.builtin.systemd_service:
+    name: nfs-server
+    enabled: true
+    state: started
+- name: Open necessary ports for firewalld
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ nfs_firewall_ports }}"
+- name: Make NFS share directory
+  ansible.builtin.file:
+    path: "{{ nfs_directory }}"
+    state: directory
+    mode: "0777"
+    owner: root
+    group: root
+- name: Add domain name to /etc/idmapd.conf
+  ansible.builtin.lineinfile:
+    path: /etc/idmapd.conf
+    regexp: "Domain ="
+    line: "Domain = {{ domain }}"
+- name: Enable NFSv4 id mapping
+  ansible.builtin.copy:
+    src: nfsd.conf
+    dest: /etc/modprobe.d
+    owner: root
+    group: root
+    mode: "0644"
+- name: Edit /etc/exports to enable share
+  ansible.builtin.template:
+    src: templates/exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart NFS
+    - Exportfs

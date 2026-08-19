@@ -1,0 +1,10 @@
+caddy_services:
+# key is subdomain, ie pihole.mediapi.localdomain
+# value is port for reverse proxy, ie 8080
+    cooking: "9000"
+    search: "8081"
+    up: "3001"
+    pdf: "9080"
+    cyberchef: "8080"
+    registry: "5000"
+    home: "8123"

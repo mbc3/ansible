@@ -1,0 +1,72 @@
+---
+- name: Set up Self-Hosted server
+  hosts: hosted
+  become: true
+
+  roles:
+    - role: rsyslog
+      tags: logs
+
+    - role: auditd
+      tags: audit
+
+    - role: sshd
+
+    - role: sudo
+
+    - role: prometheus_client
+      tags: metrics
+
+    - role: freeipa_client
+      tags: auth
+
+    - role: ca_client
+      tags: auth
+
+    - role: aide
+      tags: security
+
+    - role: selinux
+      tags: security
+
+    - role: serial
+      tags: test
+
+    - role: debug
+      tags: test
+
+    - role: caddy
+      tags: web
+
+    - role: tailscale
+      tags: tailscale
+
+    - role: nfs_client
+      tags: nfs
+
+    - role: mealie
+      tags: cooking,mealie
+
+    - role: searxng
+      tags: search
+
+    - role: uptime_kuma
+      tags: monitoring
+
+    - role: stirling_pdf
+      tags: pdf
+
+    - role: cyber_chef
+      tags: cyber
+
+    - role: container_registry
+      tags:
+        - container
+        - registry
+
+    - role: home_assistant
+      tags:
+        - home
+
+    - role: dnf
+      tags: proxy,dnf

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+<short>Proxbox</short>
+<description>Proxbox Netbox API</description>
+<port port="8800" protocol="tcp"/>
+</service>

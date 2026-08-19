@@ -1,0 +1,69 @@
+logging {
+level = "info"
+format = "logfmt"
+}
+
+loki.source.syslog "local" {
+listener {
+address  = "0.0.0.0:{{ alloy_port }}"
+protocol = "{{ alloy_protocol }}"
+syslog_format = "rfc5424"
+use_rfc5424_message = true
+label_structured_data = true
+labels = {
+      component = "loki.source.syslog",
+      protocol = "{{ alloy_protocol }}",
+      }
+}
+     relabel_rules = loki.relabel.syslog.rules
+     forward_to = [loki.write.local.receiver]
+}
+
+loki.relabel "syslog" {
+  forward_to = []
+
+  rule {
+    action = "lowercase"
+    source_labels = ["__syslog_message_hostname"]
+    target_label  = "hostname"
+  }
+
+  rule {
+    action = "replace"
+    regex = "(opnsense).(localdomain)"
+    replacement   = "$1"
+    source_labels = ["hostname"]
+    target_label  = "hostname"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_severity"]
+    target_label  = "level"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_app_name"]
+    target_label  = "syslog_app"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_facility"]
+    target_label  = "facility"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_proc_id"]
+    target_label  = "proc_id"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_msg_id"]
+    target_label  = "msg_id"
+  }
+}
+
+loki.write "local" {
+endpoint {
+url = "http://127.0.0.1:{{ alloy_loki_port }}/loki/api/v1/push"
+}
+}

@@ -1,0 +1,203 @@
+---
+
+- name: Create Authentik user
+  ansible.builtin.user:
+    name: "{{ authentik_user }}"
+    comment: Authentik Service Account
+
+- name: Add custom firewalld service
+  ansible.builtin.copy:
+    src: authentik-ldap.xml
+    dest: /etc/firewalld/services/authentik-ldap.xml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart firewalld
+
+- name: Add authentik-ldap firewalld service
+  ansible.posix.firewalld:
+    service: authentik-ldap
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ authentik_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      become_user: "{{ authentik_user }}"
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      become: true
+      become_user: "{{ authentik_user }}"
+      ansible.builtin.command: loginctl enable-linger "{{ authentik_user }}"
+      changed_when: false
+
+    - name: Create authentik bind mount parent dir
+      ansible.builtin.file:
+        name: /opt/authentik
+        state: directory
+        owner: "{{ authentik_user }}"
+        group: "{{ authentik_user }}"
+        mode: "0775"
+
+    - name: Create authentik bind mount dirs
+      ansible.builtin.file:
+        name: "{{ item }}"
+        state: directory
+        owner: "{{ authentik_user }}"
+        group: "{{ authentik_user }}"
+        mode: "0775"
+      loop: "{{ authentik_dirs }}"
+
+- name: Set up Authentik
+  become: true
+  become_user: "{{ authentik_user }}"
+  notify:
+    - Restart Authentik
+  block:
+
+    - name: Pull authentik db image
+      containers.podman.podman_image:
+        name: "{{ authentik_db_image }}"
+        tag: "{{ authentik_db_image_version }}"
+
+    - name: Pull authentik image
+      containers.podman.podman_image:
+        name: "{{ authentik_image }}"
+        tag: "{{ authentik_image_version }}"
+
+    - name: Create authentik pod
+      containers.podman.podman_pod:
+        name: authentik
+        state: quadlet
+        ports:
+          - 9000:9000
+          - 9443:9443
+        quadlet_filename: authentik.pod
+        quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
+        quadlet_options:
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create authentik db volume
+      containers.podman.podman_volume:
+        name: authentik-db
+        state: present
+
+    - name: Create authentik db quadlet file
+      containers.podman.podman_container:
+        name: authentik-db
+        image: "{{ authentik_db_image }}:{{ authentik_db_image_version }}"
+        state: quadlet
+        pod: authentik.pod
+        volume:
+          - "authentik-db:/var/lib/postgresql:z"
+        env:
+          POSTGRES_DB: authentik
+          POSTGRES_PASSWORD: "{{ authentik_db_password }}"
+          POSTGRES_USER: authentik
+        quadlet_filename: authentik-db
+        quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            Before=authentik-server.service authentik-worker.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create authentik server quadlet file
+      containers.podman.podman_container:
+        name: authentik-server
+        image: "{{ authentik_image }}:{{ authentik_image_version }}"
+        state: quadlet
+        pod: authentik.pod
+        shm_size: 512m
+        volume:
+          - /opt/authentik/data:/data:z
+          - /opt/authentik/custom-templates:/templates:z
+        command: server
+        env:
+          AUTHENTIK_POSTGRESQL__HOST: authentik-db
+          AUTHENTIK_POSTGRESQL__NAME: "authentik"
+          AUTHENTIK_POSTGRESQL__PASSWORD: "{{ authentik_db_password }}"
+          AUTHENTIK_POSTGRESQL__USER: "authentik"
+          AUTHENTIK_POSTGRESQL__PORT: 5432
+          AUTHENTIK_SECRET_KEY: "{{ authentik_secret_key }}"
+          AUTHENTIK_POSTGRESQL__SSLMODE: "disable"
+        quadlet_filename: authentik-server
+        quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service authentik-db.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Create authentik worker quadlet file
+      containers.podman.podman_container:
+        name: authentik-worker
+        image: "{{ authentik_image }}:{{ authentik_image_version }}"
+        state: quadlet
+        pod: authentik.pod
+        shm_size: 512m
+        volume:
+          - /opt/authentik/data:/data:z
+          - /opt/authentik/custom-templates:/templates:z
+          - /opt/authentik/certs:/certs:z
+        command: worker
+        env:
+          AUTHENTIK_POSTGRESQL__HOST: authentik-db
+          AUTHENTIK_POSTGRESQL__NAME: "authentik"
+          AUTHENTIK_POSTGRESQL__PASSWORD: "{{ authentik_db_password }}"
+          AUTHENTIK_POSTGRESQL__USER: "authentik"
+          AUTHENTIK_POSTGRESQL__PORT: 5432
+          AUTHENTIK_SECRET_KEY: "{{ authentik_secret_key }}"
+          AUTHENTIK_POSTGRESQL__SSLMODE: "disable"
+        quadlet_filename: authentik-worker
+        quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service authentik-db.service authentik-server.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+- name: Start authentik pod
+  become: true
+  become_user: "{{ authentik_user }}"
+  ansible.builtin.systemd_service:
+    name: authentik-pod
+    daemon_reload: true
+    scope: user
+    state: started

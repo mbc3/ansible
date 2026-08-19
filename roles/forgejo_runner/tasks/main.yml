@@ -1,0 +1,132 @@
+---
+
+- name: Install necessary packages
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ forgejo_runner_packages }}"
+
+- name: Make runner directory
+  ansible.builtin.file:
+    path: "{{ forgejo_runner_directory }}"
+    state: directory
+    owner: root
+    group: ansible
+    mode: "0770"
+
+- name: Download runner package
+  ansible.builtin.get_url:
+    url: "{{ forgejo_runner_binary_source }}/v{{ forgejo_runner_version }}/forgejo-runner-{{ forgejo_runner_version }}-linux-amd64"
+    dest: "{{ forgejo_runner_directory }}"
+    owner: root
+    group: ansible
+    mode: "0770"
+  register: forgejo_runner_package
+
+- name: Copy binary for forgejo runner
+  ansible.builtin.copy:
+    src: "{{ forgejo_runner_package.dest }}"
+    dest: /usr/local/bin/forgejo-runner
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+
+- name: Create runner user
+  ansible.builtin.user:
+    name: "{{ forgejo_runner_user }}"
+    create_home: true
+    comment: Runner Service Account
+    shell: /usr/bin/bash
+
+- name: Check if .runner file exists
+  ansible.builtin.stat:
+    name: "/home/{{ forgejo_runner_user }}/.runner"
+  register: forgejo_runner_dot_runner
+
+- name: Register runner
+  become: true
+  become_user: "{{ forgejo_runner_user }}"
+  ansible.builtin.expect:
+    chdir: "/home/{{ forgejo_runner_user }}" # need to change dir so .runner file is created in home dir
+    command: forgejo-runner register
+    responses:
+      "Enter the Forgejo instance URL":
+        - "{{ forgejo_runner_url }}"
+      "Enter the runner token":
+        - "{{ forgejo_runner_token }}"
+      "Enter the runner name":
+        - "{{ inventory_hostname }}"
+      "Enter the runner labels":
+        - "{{ forgejo_runner_labels }}"
+  when: not forgejo_runner_dot_runner.stat.exists
+
+- name: Copy runner config
+  ansible.builtin.copy:
+    src: runner-config.yml
+    dest: "/home/{{ forgejo_runner_user }}/{{ forgejo_runner_config }}"
+    owner: "{{ forgejo_runner_user }}"
+    group: "{{ forgejo_runner_user }}"
+    mode: "0664"
+  notify: Restart Forgejo runner
+
+- name: Copy Forgejo runner systemd service
+  ansible.builtin.template:
+    src: forgejo-runner.service.j2
+    dest: /etc/systemd/system/forgejo-runner.service
+    owner: root
+    group: root
+    mode: "0664"
+  notify: Restart Forgejo runner
+
+- name: Enable Forgejo runner systemd service
+  ansible.builtin.systemd_service:
+    name: forgejo-runner
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Add OpenTofu repo
+  ansible.builtin.deb822_repository:
+    name: opentofu
+    suites:
+      - any
+    types:
+      - deb
+      - deb-src
+    components:
+      - main
+    signed_by: https://packages.opentofu.org/opentofu/tofu/gpgkey
+    uris: https://packages.opentofu.org/opentofu/tofu/any/
+
+- name: Install OpenTofu
+  ansible.builtin.apt:
+    name: tofu
+    state: present
+    update_cache: true
+
+- name: Set up AWS
+  block:
+    - name: Touch aws config dir
+      ansible.builtin.file:
+        name: "/home/{{ forgejo_runner_user }}/.aws"
+        state: directory
+        owner: "{{ forgejo_runner_user }}"
+        group: "{{ forgejo_runner_user }}"
+        mode: "0750"
+
+    - name: Set AWS credentials for Tofu state
+      ansible.builtin.template:
+        src: credentials.j2
+        dest: "/home/{{ forgejo_runner_user }}/.aws/credentials"
+        owner: "{{ forgejo_runner_user }}"
+        group: "{{ forgejo_runner_user }}"
+        mode: "0600"
+
+    - name: Set AWS config
+      ansible.builtin.copy:
+        src: config
+        dest: "/home/{{ forgejo_runner_user }}/.aws/config"
+        owner: "{{ forgejo_runner_user }}"
+        group: "{{ forgejo_runner_user }}"
+        mode: "0600"

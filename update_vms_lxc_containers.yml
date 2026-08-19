@@ -1,0 +1,66 @@
+---
+- name: Update all hosts
+  become: true
+  hosts: proxmox_all_running
+
+  tasks:
+    - name: Check if AIDE exists
+      ansible.builtin.stat:
+        path: /usr/sbin/aide
+      register: aide
+
+    - name: Output AIDE status
+      ansible.builtin.debug:
+        var: aide
+
+    - name: Update all packages
+      ansible.builtin.package:
+        name: "*"
+        state: latest
+      register: updates
+      notify:
+        - Display updated packages
+        - Run AIDE update
+        - Use new AIDE DB
+
+    - name: Check if reboot is required (RHEL)
+      when: ansible_facts["distribution"] == "AlmaLinux"
+      ansible.builtin.command: dnf needs-restarting -r
+      register: dnf_reboot
+      changed_when: dnf_reboot.rc != 0
+      failed_when: false # needed because return code is technically a failure
+      notify: Reboot machine
+
+    - name: Check if reboot is required (Deb)
+      when: ansible_facts["distribution"] == "Debian"
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: apt_reboot
+      changed_when: apt_reboot.stat.exists
+      notify: Reboot machine
+
+  handlers:
+    - name: Display updated packages
+      when: updates is defined
+      ansible.builtin.debug:
+        var: updates
+
+    - name: Run AIDE update
+      when: aide.stat.exists
+      ansible.builtin.command: /usr/sbin/aide --update
+      register: aide_update
+      failed_when: aide_update.rc > 7 # see https://linux.die.net/man/1/aide for how aide generates return codes
+
+    - name: Use new AIDE DB
+      when: aide.stat.exists
+      ansible.builtin.copy:
+        remote_src: true
+        src: /var/lib/aide/aide.db.new.gz
+        dest: /var/lib/aide/aide.db.gz
+        mode: preserve
+
+    - name: Reboot machine
+      ansible.builtin.reboot:
+        msg: "Rebooting system..."
+        reboot_timeout: 3600
+        test_command: uptime

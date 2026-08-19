@@ -1,0 +1,13 @@
+ui = true
+api_addr = "https://{{ openbao_url }}"
+cluster_addr  = "http://{{ ansible_facts["default_ipv4"]["address"] }}:8201"
+
+storage "raft" {
+  path = "{{ openbao_data_dir }}"
+  node_id = "bao_node_1"
+}
+
+listener "tcp" {
+  address = "127.0.0.1:8200"
+  tls_disable = true
+}

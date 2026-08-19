@@ -1,0 +1,60 @@
+---
+- name: Set up Files server
+  hosts: files
+  become: true
+
+  roles:
+    - role: rsyslog
+      tags: logs
+
+    - role: auditd
+      tags: audit
+
+    - role: sshd
+
+    - role: sudo
+
+    - role: prometheus_client
+      tags: metrics
+
+    - role: freeipa_client
+      tags: auth
+
+    - role: ca_client
+      tags: auth
+
+    - role: aide
+      tags: security
+
+    - role: opnsense_backups
+      tags: backup
+
+    - role: nfs
+      tags: server
+
+    - role: smb
+      tags: server
+
+    - role: resilio_sync
+      tags: server
+
+    - role: syncthing
+      tags: server
+
+    - role: torrent
+      tags: torrent
+
+    - role: caddy
+      tags: caddy,web
+
+    - role: selinux
+      tags: security
+
+    - role: serial
+      tags: test
+
+    - role: debug
+      tags: test
+
+    - role: dnf
+      tags: proxy,dnf

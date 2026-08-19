@@ -1,0 +1,2 @@
+---
+tailscale_dnf_repo: "https://pkgs.tailscale.com/stable/rhel/10/tailscale.repo"

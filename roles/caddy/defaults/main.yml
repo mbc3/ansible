@@ -1,0 +1,4 @@
+---
+# defaults to false since we don't need this
+caddy_proxy_to_https: false
+caddy_headers: false

@@ -1,0 +1,16 @@
+---
+# ansible-inventory -i proxmox.yml --vault-id @prompt --list
+# ansible-inventory -i proxmox.yml --ask-vault-pass --list
+# ansible-inventory -i proxmox.yml --vault-password-file .vault --list
+plugin: community.proxmox.proxmox
+url: https://services.localdomain:8006
+user: ansible@pve
+token_id: ansible
+# token_secret is now an environment variable PROXMOX_TOKEN_SECRET
+validate_certs: true # if tls isn't working, set to false
+want_facts: true
+want_proxmox_nodes_ansible_host: true
+compose:
+  # this sets the ansible_host to the container's public IP -- otherwise it would use the hostname to connect
+  # I don't need this if I've set up DNS
+  # ansible_host: proxmox_lxc_interfaces.1.inet.split('/').0

@@ -1,0 +1,30 @@
+---
+- name: Set up openbao server
+  hosts: openbao
+  become: true
+
+  roles:
+    - role: rsyslog
+      tags: logs
+
+    - role: sshd
+
+    - role: sudo
+
+    - role: prometheus_client
+      tags: metrics
+
+    - role: ca_client
+      tags: auth
+
+    - role: freeipa_client
+      tags: auth
+
+    - role: openbao
+      tags: openbao
+
+    - role: caddy
+      tags: web
+
+    - role: dnf
+      tags: proxy,dnf
