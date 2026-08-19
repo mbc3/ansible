@@ -1,0 +1,72 @@
+---
+on:
+  #workflow_dispatch:
+  schedule:
+    - cron: '30 7 * * 6'
+      timezone: America/Los_Angeles
+enable-email-notifications: true
+
+jobs:
+  lint:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Minimum linter
+        run: ansible-lint --profile=min
+
+  update:
+    runs-on: self-hosted
+    needs: lint
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install required collections
+        run: ansible-galaxy collection install -r requirements.yml
+        working-directory: ./HomeLab
+
+      - name: Put vault pass on system
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_PROXMOX_VAULT_PASSWORD }}
+        run: printf '%s' "$VAULT_PASSWORD" > ~/.vault
+
+      - name: Set perms on vault pass
+        run: chmod 0600 ~/.vault
+
+      - name: Make SSH directory
+        run: mkdir -p ~/.ssh
+
+      - name: Set SSH dir perms
+        run: chmod 0700 ~/.ssh
+
+      - name: Copy SSH key
+        env:
+          PROXMOX_SSH_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+        run: echo "$PROXMOX_SSH_KEY" > ~/.ssh/proxmox
+
+      - name: Set SSH key perms
+        run: chmod 0600 ~/.ssh/proxmox
+
+      - name: Inventory check
+        env:
+          PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+        run: ansible-inventory -i inventory/proxmox.yml --graph
+        working-directory: ./HomeLab
+
+      - name: Update HomeLab VMs and Containers
+        env:
+          PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+        run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_vms_lxc_containers.yml
+        working-directory: ./HomeLab
+
+      - name: Update HomeLab Proxmox
+        env:
+          PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+        run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_proxmox.yml
+        working-directory: ./HomeLab
+
+      - name: Clean up secrets
+        if: always()
+        run: |
+            rm -f ~/.vault
+            rm -f ~/.ssh/proxmox
