@@ -1,3 +1,4 @@
+.ansible/
 .vscode
 .pytest_cache
 TEST
