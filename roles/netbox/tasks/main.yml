@@ -48,10 +48,10 @@
         mode: "0775"
 
 - name: Build Plugin Container
-  ansible.builtin.include_tasks: Plugin.yml
+  ansible.builtin.include_tasks: plugin.yml
 
 - name: Set up Proxmox Netbox API Container
-  ansible.builtin.include_tasks: Proxbox-netbox.yml
+  ansible.builtin.include_tasks: proxbox-netbox.yml
 
 - name: Set up netbox container
   become: true

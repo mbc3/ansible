@@ -1,6 +1,6 @@
 ---
 
-- name: Proxbox-netbox Add proxbox custom firewalld service
+- name: proxbox-netbox | Add proxbox custom firewalld service
   ansible.builtin.copy:
     src: proxbox-netbox.xml
     dest: /etc/firewalld/services/proxbox-netbox.xml
@@ -9,25 +9,25 @@
     mode: "0644"
   notify: Restart firewalld
 
-- name: Proxbox-netbox Add proxbox firewalld service
+- name: proxbox-netbox | Add proxbox firewalld service
   ansible.posix.firewalld:
     service: proxbox-netbox
     permanent: true
     immediate: true
     state: enabled
 
-- name: Proxbox-netbox Set up netbox plugin container
+- name: proxbox-netbox | Set up netbox plugin container
   become: true
   become_user: "{{ netbox_user }}"
   notify: Restart Proxbox API
   block:
 
-    - name: Proxbox-netbox Pull proxbox api image
+    - name: proxbox-netbox | Pull proxbox api image
       containers.podman.podman_image:
         name: docker.io/emersonfelipesp/proxbox-api
         tag: latest
 
-    - name: Proxbox-netbox Create proxbox api quadlet file
+    - name: proxbox-netbox | Create proxbox api quadlet file
       containers.podman.podman_container:
         name: proxbox-api
         image: "docker.io/emersonfelipesp/proxbox-api:latest"
