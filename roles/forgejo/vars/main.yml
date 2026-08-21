@@ -1,4 +1,5 @@
 forgejo_packages:
   - podman
   - systemd-container
-forgejo_image: "codeberg.org/forgejo/forgejo:15"
+forgejo_image: "codeberg.org/forgejo/forgejo"
+forgejo_image_version: "15"
