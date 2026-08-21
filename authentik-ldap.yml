@@ -22,3 +22,6 @@
 
     - role: dnf
       tags: proxy,dnf
+
+    - role: authentik_ldap
+      tags: authentik_ldap,authentik-ldap,ldap

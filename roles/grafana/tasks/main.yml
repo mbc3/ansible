@@ -87,7 +87,8 @@
         quadlet_dir: "/home/{{ grafana_user }}/.config/containers/systemd"
         volume:
           - "grafana-storage:/var/lib/grafana"
-          - "/opt/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:z" # make sure this file exists by cat-ing the root ca in /opt/certs with the grafana certs
+          - "/opt/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:z"
+          # make sure this file exists by cat-ing the root ca in /opt/certs with the grafana certs
         env:
           GF_ANALYTICS_REPORTING_ENABLED: false
           GF_SMTP_ENABLED: true

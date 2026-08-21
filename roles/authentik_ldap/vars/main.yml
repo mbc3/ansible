@@ -1,0 +1,7 @@
+---
+authentik_ldap_packages:
+  - podman
+  - systemd-container
+authentik_ldap_image: "ghcr.io/goauthentik/ldap"
+authentik_ldap_image_version: "2026.5.6"
+authentik_ldap_token: "{{ vault_authentik_ldap_token }}"

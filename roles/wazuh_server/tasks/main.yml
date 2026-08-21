@@ -86,7 +86,19 @@
 - name: TLS Cert
   block:
     - name: Run certbot
-      ansible.builtin.command: certbot certonly -n --standalone -d wazuh.localdomain --server https://ca.localdomain:8443/acme/acme/directory --agree-tos --email cohen@matthewbriancohen.com
+      ansible.builtin.command:
+        argv:
+          - certbot
+          - certonly
+          - -n
+          - --standalone
+          - -d
+          - wazuh.localdomain
+          - --server
+          - https://ca.localdomain:8443/acme/acme/directory
+          - --agree-tos
+          - --email
+          - cohen@matthewbriancohen.com
       changed_when: false
 
     - name: Copy Root CA to Wazuh directory

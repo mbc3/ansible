@@ -1,0 +1,57 @@
+- name: Install Podman
+  block:
+    - name: Install necessary packages
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ authentik_ldap_packages }}"
+
+    - name: Enable podman auto-update service
+      become: true
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+
+    - name: Enable linger
+      become: true
+      ansible.builtin.command: loginctl enable-linger "root"
+      changed_when: true
+
+- name: Pull authentik-ldap image
+  containers.podman.podman_image:
+    name: "{{ authentik_ldap_image }}"
+    tag: "{{ authentik_ldap_image_version }}"
+
+- name: Create autentik-ldap quadlet file
+  notify: Restart authentik-ldap
+  containers.podman.podman_container:
+    name: authentik-ldap
+    image: "{{ authentik_ldap_image }}:{{ authentik_ldap_image_version }}"
+    state: quadlet
+    quadlet_filename: authentik-ldap
+    quadlet_dir: /etc/containers/systemd
+    publish:
+      - "389:3389"
+      - "636:6636"
+    env:
+      AUTHENTIK_HOST: "https://sso.authentik.localdomain"
+      AUTHENTIK_INSECURE: "true"
+      AUTHENTIK_TOKEN: "{{ authentik_ldap_token }}"
+    quadlet_options:
+      - "AutoUpdate=registry"
+      - |
+        [Unit]
+        Wants=network-online.target
+        After=network-online.target
+        [Service]
+        Restart=always
+        [Install]
+        WantedBy=default.target
+
+- name: Start authentik-ldap
+  become: true
+  ansible.builtin.systemd_service:
+    name: authentik-ldap
+    daemon_reload: true
+    state: started
