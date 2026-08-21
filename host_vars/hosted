@@ -7,4 +7,3 @@ caddy_services:
     pdf: "9080"
     cyberchef: "8080"
     registry: "5000"
-    home: "8123"
