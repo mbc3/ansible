@@ -11,5 +11,5 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Minimum linter
+      - name: Linter
         run: ansible-lint

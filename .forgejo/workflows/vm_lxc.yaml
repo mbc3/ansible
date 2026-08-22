@@ -3,7 +3,7 @@ on:
   # uncomment to run on demand in forgejo UI
   # workflow_dispatch
   schedule:
-    - cron: '30 12 * * 6'
+    - cron: '30 12 * * 2,4,6'
       timezone: America/Los_Angeles
 enable-email-notifications: true
 
