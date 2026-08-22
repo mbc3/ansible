@@ -55,6 +55,7 @@ jobs:
       - name: Update HomeLab Proxmox
         env:
           PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
+          ANSIBLE_HOST_KEY_CHECKING: False
         run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_proxmox.yml
 
       - name: Clean up secrets
