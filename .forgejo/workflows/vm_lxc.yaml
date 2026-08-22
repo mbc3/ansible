@@ -57,6 +57,7 @@ jobs:
           PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
           ANSIBLE_HOST_KEY_CHECKING: False
         run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_vms_lxc_containers.yml
+        continue-on-error: true
 
       - name: Clean up secrets
         if: always()
