@@ -1,11 +1,11 @@
 ---
 on:
   # uncomment to run on demand in forgejo UI
-  # workflow_dispatch
-  schedule:
-    - cron: '30 12 * * 6'
-      timezone: America/Los_Angeles
-enable-email-notifications: true
+  workflow_dispatch
+#   schedule:
+#     - cron: '30 12 * * 6'
+#       timezone: America/Los_Angeles
+# enable-email-notifications: true
 
 jobs:
   lint:
@@ -52,10 +52,10 @@ jobs:
           PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
         run: ansible-inventory -i inventory/proxmox.yml --graph
 
-      - name: Update HomeLab VMs and Containers
+      - name: Update HomeLab Proxmox
         env:
           PROXMOX_TOKEN_SECRET: ${{ secrets.PROXMOX_TOKEN_SECRET }}
-        run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_vms_lxc_containers.yml
+        run: ansible-playbook -i inventory/proxmox.yml --vault-password-file ~/.vault update_proxmox.yml
 
       - name: Clean up secrets
         if: always()
