@@ -9,10 +9,6 @@
         path: /usr/sbin/aide
       register: aide
 
-    - name: Output AIDE status
-      ansible.builtin.debug:
-        var: aide
-
     - name: Update all packages
       ansible.builtin.package:
         name: "*"
