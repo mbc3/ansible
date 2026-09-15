@@ -1,0 +1,22 @@
+---
+- name: Install dependencies
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ skel_packages }}"
+
+- name: Copy vimrc
+  ansible.builtin.copy:
+    src: .vimrc
+    dest: /etc/skel/.vimrc
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Copy tmux
+  ansible.builtin.copy:
+    src: .tmux.conf
+    dest: /etc/skel/.tmux.conf
+    owner: root
+    group: root
+    mode: "0640"

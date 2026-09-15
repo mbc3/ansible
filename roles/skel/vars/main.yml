@@ -1,0 +1,4 @@
+---
+skel_packages:
+  - vim
+  - tmux

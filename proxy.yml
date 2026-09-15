@@ -20,6 +20,9 @@
     - role: freeipa_client
       tags: auth
 
+    - role: skel
+      tags: defaults
+
     - role: ca_client
       tags: auth
 

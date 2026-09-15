@@ -32,6 +32,9 @@
     - role: selinux
       tags: security
 
+    - role: skel
+      tags: defaults
+
     - role: pxe
       tags: boot
 

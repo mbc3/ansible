@@ -35,6 +35,9 @@
     - role: selinux
       tags: security
 
+    - role: skel
+      tags: defaults
+
     - role: serial
       tags: test
 

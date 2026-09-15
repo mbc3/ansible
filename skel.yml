@@ -1,0 +1,19 @@
+---
+- name: Set skel
+  become: true
+  hosts: proxmox_all_running
+
+  roles:
+    - role: skel
+
+  tasks:
+    - name: Get users
+      ansible.builtin.find:
+        paths: /home
+        file_type: directory
+        depth: 1
+      register: system_users
+
+    - name: Debug
+      ansible.builtin.debug:
+        var: system_users

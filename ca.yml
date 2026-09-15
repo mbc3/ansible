@@ -23,5 +23,8 @@
     - role: freeipa_client
       tags: auth
 
+    - role: skel
+      tags: defaults
+
     - role: dnf
       tags: proxy,dnf
