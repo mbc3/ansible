@@ -7,7 +7,7 @@ authentik_db_image: "docker.io/library/postgres"
 authentik_db_image_version: "18-alpine"
 authentik_db_password: "{{ vault_authentik_db_password }}"
 authentik_image: "ghcr.io/goauthentik/server"
-authentik_image_version: "2026.5.7"
+authentik_image_version: "2026.8.3"
 authentik_secret_key: "{{ vault_authentik_secret_key }}"
 authentik_dirs:
   - /opt/authentik/data
