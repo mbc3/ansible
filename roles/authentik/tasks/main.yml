@@ -85,6 +85,10 @@
         ports:
           - 9000:9000
           - 9443:9443
+          - 9001:9001
+          - 9444:9444
+          - 9300:9300
+          - 9301:9301
         quadlet_filename: authentik.pod
         quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
         quadlet_options:
@@ -147,9 +151,8 @@
           AUTHENTIK_POSTGRESQL__PORT: 5432
           AUTHENTIK_SECRET_KEY: "{{ authentik_secret_key }}"
           AUTHENTIK_POSTGRESQL__SSLMODE: "disable"
-          # for new version that doesn't work yet
+          AUTHENTIK_LISTEN__METRICS: "[::]:9300"
           AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: "127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fe80::/10, ::1/128, fd35:a2c1:18bd::/48, 2603:8000:b500::/48"
-          # AUTHENTIK_WEB__BASE_URL: https://authentik-server:9443
         quadlet_filename: authentik-server
         quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
         quadlet_options:
@@ -183,6 +186,9 @@
           AUTHENTIK_POSTGRESQL__PORT: 5432
           AUTHENTIK_SECRET_KEY: "{{ authentik_secret_key }}"
           AUTHENTIK_POSTGRESQL__SSLMODE: "disable"
+          AUTHENTIK_LISTEN__HTTP: "[::]:9001"
+          AUTHENTIK_LISTEN__HTTPS: "[::]:9444"
+          AUTHENTIK_LISTEN__METRICS: "[::]:9301"
         quadlet_filename: authentik-worker
         quadlet_dir: "/home/{{ authentik_user }}/.config/containers/systemd"
         quadlet_options:
