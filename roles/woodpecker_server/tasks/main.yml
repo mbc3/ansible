@@ -5,10 +5,11 @@
     state: present
     comment: "Woodpecker CI Service Account"
 
-- name: Install podman
-  ansible.builtin.package:
-    name: podman
+- name: Install necessary packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
     state: present
+  loop: "{{ woodpecker_server_packages }}"
 
 - name: Install podman dependencies
   become: true
@@ -45,6 +46,7 @@
           - 8000:8000
         volume:
           - woodpecker-server-data:/var/lib/woodpecker/:z
+         # - /path/to/root-ca.crt:/etc/pki/ca-trust/source/anchors/root-ca.crt:ro
         env:
           WOODPECKER_OPEN: true
           WOODPECKER_HOST: https://woodpecker.forgejo.localdomain
@@ -53,13 +55,16 @@
           WOODPECKER_FORGEJO_CLIENT: "{{ woodpecker_server_client_id }}"
           WOODPECKER_FORGEJO_SECRET: "{{ woodpecker_server_secret }}"
           WOODPECKER_ADMIN: "mbc"
+          WOODPECKER_FORCE_IGNORE_SERVICE_FAILURE: false
+          WOODPECKER_FORGEJO_SKIP_VERIFY: true
+
         quadlet_filename: woodpecker-server
         quadlet_dir: "/home/{{ woodpecker_server_user }}/.config/containers/systemd"
         quadlet_options:
           - "AutoUpdate=registry"
           - |
             [Container]
-            AddHost=repo.forgejo.localdomain:10.88.0.1
+            AddHost=repo.forgejo.localdomain:host-gateway
             [Unit]
             Wants=podman-user-wait-network-online.service
             After=podman-user-wait-network-online.service
