@@ -1,0 +1,76 @@
+---
+- name: Create user
+  ansible.builtin.user:
+    name: "{{ woodpecker_server_user }}"
+    state: present
+    comment: "Woodpecker CI Service Account"
+
+- name: Install podman
+  ansible.builtin.package:
+    name: podman
+    state: present
+
+- name: Install podman dependencies
+  become: true
+  become_user: "{{ woodpecker_server_user }}"
+  block:
+
+    - name: Enable podman auto-update service
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      ansible.builtin.command: loginctl enable-linger "{{ woodpecker_server_user }}"
+      changed_when: false
+
+- name: Install woodpecker server
+  become: true
+  become_user: "{{ woodpecker_server_user }}"
+  notify: Restart Woodpecker-server
+  block:
+    - name: Pull server image
+      ansible.builtin.podman_image:
+        name: "quay.io/woodpeckerci/woodpecker-server:{{ woodpecker_server_version }}"
+        state: present
+
+    - name: Create server quadlet file
+      containers.podman.podman_container:
+        name: woodpecker-server
+        image: "quay.io/woodpeckerci/woodpecker-server:{{ woodpecker_server_version }}"
+        state: quadlet
+        publish:
+          - 8000:8000
+        volume:
+          - woodpecker-server-data:/var/lib/woodpecker/:z
+        env:
+          WOODPECKER_OPEN: true
+          WOODPECKER_HOST: https://woodpecker.forgejo.localdomain
+          WOODPECKER_FORGEJO: true
+          WOODPECKER_FORGEJO_URL: https://repo.forgejo.localdomain
+          WOODPECKER_FORGEJO_CLIENT: "{{ woodpecker_server_client_id }}"
+          WOODPECKER_FORGEJO_SECRET: "{{ woodpecker_server_secret }}"
+          WOODPECKER_ADMIN: "mbc"
+        quadlet_filename: woodpecker-server
+        quadlet_dir: "/home/{{ woodpecker_server_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Container]
+            AddHost=repo.forgejo.localdomain:10.88.0.1
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Start woodpecker-server service
+      ansible.builtin.systemd_service:
+        name: woodpecker-server
+        daemon_reload: true
+        scope: user
+        state: started

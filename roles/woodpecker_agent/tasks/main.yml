@@ -1,0 +1,67 @@
+---
+- name: Create user
+  ansible.builtin.user:
+    name: "{{ woodpecker_agent_user }}"
+    state: present
+    comment: "Woodpecker CI Service Account"
+
+- name: Install podman dependencies
+  become: true
+  become_user: "{{ woodpecker_agent_user }}"
+  block:
+    - name: Install podman
+      ansible.builtin.package:
+        name: podman
+        state: present
+
+    - name: Enable podman auto-update service
+      ansible.builtin.systemd_service:
+        name: podman-auto-update.timer
+        enabled: true
+        state: started
+        scope: user
+
+    - name: Enable linger
+      ansible.builtin.command: loginctl enable-linger "{{ woodpecker_agent_user }}"
+      changed_when: false
+
+- name: Install woodpecker agent
+  become: true
+  become_user: "{{ woodpecker_agent_user }}"
+  block:
+    - name: Pull agent image
+      ansible.builtin.podman_image:
+        name: "{{ woodpecker_agent_registry }}:{{ woodpecker_agent_version }}"
+        state: present
+
+    - name: Create agent quadlet file
+      containers.podman.podman_container:
+        name: woodpecker-agent
+        image: "{{ woodpecker_agent_registry }}:{{ woodpecker_agent_version }}"
+        state: quadlet
+        volume:
+          - woodpecker-agent-config:/etc/woodpecker:z
+        env:
+          - WOODPECKER_SERVER=forgejo:9000
+          - WOODPECKER_AGENT_SECRET=${WOODPECKER_AGENT_SECRET}
+        quadlet_filename: woodpecker-agent
+        quadlet_dir: "/home/{{ woodpecker_agent_user }}/.config/containers/systemd"
+        quadlet_options:
+          - "AutoUpdate=registry"
+          - |
+            [Unit]
+            Wants=podman-user-wait-network-online.service
+            After=podman-user-wait-network-online.service
+            [Service]
+            Restart=always
+            [Install]
+            WantedBy=default.target
+
+    - name: Start woodpecker-agent service
+      become: true
+      become_user: "{{ woodpecker_agent_user }}"
+      ansible.builtin.systemd_service:
+        name: woodpecker-agent
+        daemon_reload: true
+        scope: user
+        state: started

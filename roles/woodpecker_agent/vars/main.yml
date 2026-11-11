@@ -1,0 +1,4 @@
+---
+woodpecker_agent_registry: "quay.io/woodpeckerci/woodpecker-agent"
+woodpecker_agent_version: "v3"
+woodpecker_agent_user: "woody"
