@@ -5,6 +5,14 @@
     state: present
     comment: "Forgejo Service Account"
 
+- name: Allow privilege port for rootless
+  ansible.builtin.file:
+    src:
+    dest: /etc/sysctl.d/99-podman-privileged-ports.conf
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Install necessary packages
   ansible.builtin.dnf:
     name: "{{ item }}"
@@ -67,6 +75,13 @@
             [Install]
             WantedBy=default.target
 
+    - name: Start forgejo
+      ansible.builtin.systemd_service:
+        name: forgejo
+        daemon_reload: true
+        scope: user
+        state: started
+
 - name: Add forgejo custom firewalld service
   ansible.builtin.copy:
     src: forgejo.xml
@@ -82,11 +97,3 @@
     permanent: true
     immediate: true
     state: enabled
-
-- name: Start forgejo
-  become: true
-  ansible.builtin.systemd_service:
-    name: forgejo
-    daemon_reload: true
-    scope: user
-    state: started
