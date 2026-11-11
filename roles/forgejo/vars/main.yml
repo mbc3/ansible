@@ -1,3 +1,4 @@
+forgejo_user: forgey
 forgejo_packages:
   - podman
   - systemd-container

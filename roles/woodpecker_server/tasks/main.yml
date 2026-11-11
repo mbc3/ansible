@@ -32,9 +32,9 @@
   notify: Restart Woodpecker-server
   block:
     - name: Pull server image
-      ansible.builtin.podman_image:
-        name: "quay.io/woodpeckerci/woodpecker-server:{{ woodpecker_server_version }}"
-        state: present
+      containers.podman.podman_image:
+        name: "quay.io/woodpeckerci/woodpecker-server"
+        tag: "{{ woodpecker_server_version }}"
 
     - name: Create server quadlet file
       containers.podman.podman_container:

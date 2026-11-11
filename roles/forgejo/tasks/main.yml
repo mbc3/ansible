@@ -1,11 +1,20 @@
 ---
-- name: Install Podman
+- name: Create user
+  ansible.builtin.user:
+    name: "{{ forgejo_user }}"
+    state: present
+    comment: "Forgejo Service Account"
+
+- name: Install necessary packages
+  ansible.builtin.dnf:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ forgejo_packages }}"
+
+- name: Install podman dependencies
+  become: true
+  become_user: "{{ forgejo_user }}"
   block:
-    - name: Install necessary packages
-      ansible.builtin.dnf:
-        name: "{{ item }}"
-        state: present
-      loop: "{{ forgejo_packages }}"
 
     - name: Enable podman auto-update service
       ansible.builtin.systemd_service:
@@ -13,8 +22,13 @@
         enabled: true
         state: started
 
+    - name: Enable linger
+      ansible.builtin.command: loginctl enable-linger "{{ forgejo_user }}"
+      changed_when: false
+
 - name: Set up forgejo
   become: true
+  become_user: "{{ forgejo_user }}"
   notify: Restart forgejo
   block:
     - name: Pull forgejo image
@@ -33,7 +47,7 @@
         image: "{{ forgejo_image }}:{{ forgejo_image_version }}"
         state: quadlet
         quadlet_filename: forgejo
-        quadlet_dir: /etc/containers/systemd
+        quadlet_dir: "/home/{{ forgejo_user }}/.config/containers/systemd"
         volume:
           - forgejo-data:/data:z
         publish:
@@ -53,13 +67,6 @@
             [Install]
             WantedBy=default.target
 
-- name: Start forgejo
-  become: true
-  ansible.builtin.systemd_service:
-    name: forgejo
-    daemon_reload: true
-    state: started
-
 - name: Add forgejo custom firewalld service
   ansible.builtin.copy:
     src: forgejo.xml
@@ -75,3 +82,11 @@
     permanent: true
     immediate: true
     state: enabled
+
+- name: Start forgejo
+  become: true
+  ansible.builtin.systemd_service:
+    name: forgejo
+    daemon_reload: true
+    scope: user
+    state: started
