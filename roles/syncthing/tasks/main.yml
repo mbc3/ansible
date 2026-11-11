@@ -1,8 +1,14 @@
 ---
 - name: Install Syncthing
-  become: true
   ansible.builtin.dnf:
     name: syncthing
+    state: present
+
+- name: Create syncthing service account
+  ansible.builtin.user:
+    name: "{{ syncthing_user }}"
+    comment: Syncthing Service Account
+    shell: /bin/bash
     state: present
 
 - name: Enable linger
@@ -12,7 +18,6 @@
   changed_when: false
 
 - name: Open Syncthing firewall ports
-  become: true
   ansible.posix.firewalld:
     service: "{{ item }}"
     permanent: true
@@ -20,15 +25,7 @@
     state: enabled
   loop: "{{ syncthing_ports }}"
 
-- name: Create syncthing service account
-  ansible.builtin.user:
-    name: "{{ syncthing_user }}"
-    comment: Syncthing Service Account
-    shell: /bin/bash
-    state: present
-
 - name: Enable Syncthing service
-  become: true
   become_user: "{{ syncthing_user }}"
   ansible.builtin.systemd_service:
     name: syncthing
