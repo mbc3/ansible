@@ -1,4 +1,11 @@
 ---
+
+# REMINDER:
+# you need to create the forgejo oath application
+# as well as modify app.ini to include
+# [webhook]
+# ALLOWED_HOST_LIST=external,loopback
+
 - name: Create user
   ansible.builtin.user:
     name: "{{ woodpecker_server_user }}"
@@ -65,18 +72,22 @@
           - woodpecker-server-data:/var/lib/woodpecker/:z
         env:
           WOODPECKER_OPEN: true
-          WOODPECKER_HOST: http://host.containers.internal:8000
+          WOODPECKER_HOST: https://woodpecker.forgejo.localdomain
           WOODPECKER_FORGEJO: true
-          WOODPECKER_FORGEJO_URL: http://host.containers.internal:3000
+          WOODPECKER_FORGEJO_URL: https://repo.forgejo.localdomain
           WOODPECKER_FORGEJO_CLIENT: "{{ woodpecker_server_client_id }}"
           WOODPECKER_FORGEJO_SECRET: "{{ woodpecker_server_secret }}"
+          WOODPECKER_AGENT_SECRET: "{{ woodpecker_server_shared_secret }}"
           WOODPECKER_ADMIN: "mbc"
           WOODPECKER_FORCE_IGNORE_SERVICE_FAILURE: false
+          WOODPECKER_FORGEJO_SKIP_VERIFY: true
         quadlet_filename: woodpecker-server
         quadlet_dir: "/home/{{ woodpecker_server_user }}/.config/containers/systemd"
         quadlet_options:
           - "AutoUpdate=registry"
           - |
+            [Container]
+            AddHost=repo.forgejo.localdomain:host-gateway
             [Unit]
             Wants=podman-user-wait-network-online.service
             After=podman-user-wait-network-online.service

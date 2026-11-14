@@ -22,3 +22,6 @@
 
     - role: forgejo_runner
       tags: runner
+
+    - role: woodpecker_agent
+      tags: runner,woodpecker
