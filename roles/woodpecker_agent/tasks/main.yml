@@ -75,7 +75,6 @@
           WOODPECKER_SERVER: woodpecker.forgejo.localdomain:9000
           WOODPECKER_AGENT_SECRET: "{{ woodpecker_agent_shared_secret }}"
           WOODPECKER_GRPC_SECURE: false
-          WOODPECKER_GRPC_SKIP_VERIFY: true
           WOODPECKER_MAX_WORKFLOWS: 2
           WOODPECKER_BACKEND: docker
           DOCKER_HOST: "unix:///run/user/{{ woodpecker_agent_uid }}/podman/podman.sock"
