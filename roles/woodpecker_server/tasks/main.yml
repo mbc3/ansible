@@ -27,6 +27,22 @@
       ansible.builtin.command: loginctl enable-linger "{{ woodpecker_server_user }}"
       changed_when: false
 
+- name: Add woodpecker custom firewalld service
+  ansible.builtin.copy:
+    src: woodpecker.xml
+    dest: /etc/firewalld/services/woodpecker.xml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart firewalld
+
+- name: Add forgejo firewalld service
+  ansible.posix.firewalld:
+    service: woodpecker
+    permanent: true
+    immediate: true
+    state: enabled
+
 - name: Install woodpecker server
   become: true
   become_user: "{{ woodpecker_server_user }}"
@@ -34,19 +50,19 @@
   block:
     - name: Pull server image
       containers.podman.podman_image:
-        name: "quay.io/woodpeckerci/woodpecker-server"
+        name: "{{ woodpecker_server_registry }}"
         tag: "{{ woodpecker_server_version }}"
 
     - name: Create server quadlet file
       containers.podman.podman_container:
         name: woodpecker-server
-        image: "quay.io/woodpeckerci/woodpecker-server:{{ woodpecker_server_version }}"
+        image: "{{ woodpecker_server_registry }}:{{ woodpecker_server_version }}"
         state: quadlet
         publish:
           - 8000:8000
+          - 9000:9000
         volume:
           - woodpecker-server-data:/var/lib/woodpecker/:z
-         # - /path/to/root-ca.crt:/etc/pki/ca-trust/source/anchors/root-ca.crt:ro
         env:
           WOODPECKER_OPEN: true
           WOODPECKER_HOST: http://host.containers.internal:8000

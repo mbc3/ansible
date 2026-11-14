@@ -4,15 +4,18 @@
     name: "{{ woodpecker_agent_user }}"
     state: present
     comment: "Woodpecker CI Service Account"
+    uid: "{{ woodpecker_agent_uid }}"
+
+- name: Install necessary packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ woodpecker_agent_packages }}"
 
 - name: Install podman dependencies
   become: true
   become_user: "{{ woodpecker_agent_user }}"
   block:
-    - name: Install podman
-      ansible.builtin.package:
-        name: podman
-        state: present
 
     - name: Enable podman auto-update service
       ansible.builtin.systemd_service:
@@ -25,14 +28,19 @@
       ansible.builtin.command: loginctl enable-linger "{{ woodpecker_agent_user }}"
       changed_when: false
 
+    - name: Enable socket
+      ansible.builtin.command: systemctl --user enable --now podman.socket
+      changed_when: true
+
 - name: Install woodpecker agent
   become: true
   become_user: "{{ woodpecker_agent_user }}"
+  notify: Restart Woodpecker-agent
   block:
     - name: Pull agent image
-      ansible.builtin.podman_image:
-        name: "{{ woodpecker_agent_registry }}:{{ woodpecker_agent_version }}"
-        state: present
+      containers.podman.podman_image:
+        name: "{{ woodpecker_agent_registry }}"
+        tag: "{{ woodpecker_agent_version }}"
 
     - name: Create agent quadlet file
       containers.podman.podman_container:
@@ -41,9 +49,15 @@
         state: quadlet
         volume:
           - woodpecker-agent-config:/etc/woodpecker:z
+          - "/run/user/{{ woodpecker_agent_uid }}/podman/podman.sock:/run/user/{{ woodpecker_agent_uid }}/podman/podman.sock:z"
         env:
-          - WOODPECKER_SERVER=forgejo:9000
-          - WOODPECKER_AGENT_SECRET=${WOODPECKER_AGENT_SECRET}
+          WOODPECKER_SERVER: http://woodpecker.forgejo.localdomain:9000
+          WOODPECKER_AGENT_SECRET: YOUR_INDIVIDUAL_AGENT_TOKEN
+          WOODPECKER_GRPC_SECURE: false
+          WOODPECKER_GRPC_SKIP_VERIFY: true
+          WOODPECKER_MAX_WORKFLOWS: 2
+          WOODPECKER_BACKEND: docker
+          DOCKER_HOST: "unix:///run/user/{{ woodpecker_agent_uid }}/podman/podman.sock"
         quadlet_filename: woodpecker-agent
         quadlet_dir: "/home/{{ woodpecker_agent_user }}/.config/containers/systemd"
         quadlet_options:
@@ -58,8 +72,6 @@
             WantedBy=default.target
 
     - name: Start woodpecker-agent service
-      become: true
-      become_user: "{{ woodpecker_agent_user }}"
       ansible.builtin.systemd_service:
         name: woodpecker-agent
         daemon_reload: true

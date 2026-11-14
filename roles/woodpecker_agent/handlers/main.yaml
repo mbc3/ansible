@@ -1,0 +1,8 @@
+---
+- name: Restart Woodpecker-agent
+  become: true
+  become_user: "{{ woodpecker_agent_user }}"
+  ansible.builtin.systemd_service:
+    name: woodpecker-agent
+    state: restarted
+    scope: user

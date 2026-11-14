@@ -2,7 +2,7 @@
 woodpecker_server_packages:
     - podman
     - systemd-container
-woodpecker_server_registry: "https://quay.io/repository/woodpeckerci/woodpecker-server"
+woodpecker_server_registry: "quay.io/woodpeckerci/woodpecker-server"
 woodpecker_server_version: "v3"
 woodpecker_server_user: "woody"
 woodpecker_server_client_id: "2f4d3632-095b-4304-9255-1e59e18f0187"

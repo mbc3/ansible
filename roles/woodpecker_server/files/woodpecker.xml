@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+<short>Woodpecker CI</short>
+<description>Woodpecker CI for agents to access server</description>
+<port port="9000" protocol="tcp"/>
+</service>

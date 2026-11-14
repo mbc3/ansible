@@ -1,4 +1,10 @@
 ---
-woodpecker_agent_registry: "quay.io/woodpeckerci/woodpecker-agent"
-woodpecker_agent_version: "v3"
+woodpecker_agent_packages:
+    - podman
+    - systemd-container
 woodpecker_agent_user: "woody"
+woodpecker_agent_uid: 1010
+woodpecker_agent_registry: "quay.io/repository/woodpeckerci/woodpecker-agent"
+woodpecker_agent_version: "v3"
+woodpecker_agent_client_id: "2f4d3632-095b-4304-9255-1e59e18f0187"
+woodpecker_agent_secret: "{{ vault_woodpecker_server_secret }}"
