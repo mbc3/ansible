@@ -1,6 +1,7 @@
 sshd_allowed_users:
   - ansible
   - mbc
+  - bot
   - opnsense
 
 caddy_services:
